@@ -27,11 +27,7 @@ public:
 	void createRenderBuffers(const ovrHmd& hmd, osg::ref_ptr<osg::State> state, const ovrSizei& size);
 	osg::ref_ptr<osg::Texture2D> texture() const { return m_texture; }
 	void advanceIndex() { m_textureSet->CurrentIndex = (m_textureSet->CurrentIndex + 1) % m_textureSet->TextureCount; }
-#if(OSG_VERSION_GREATER_OR_EQUAL(3, 4, 0))
-	void setRenderSurface(const osg::GLExtensions* fbo_ext);
-#else
-	void setRenderSurface(const osg::FBOExtensions* fbo_ext);
-#endif
+	void setRenderSurface(const osg::State& state);
 	void initializeFboId(GLuint id) { m_fboId = id; m_fboIdInitialized = true; }
 	bool isFboIdInitialized() const { return m_fboIdInitialized; }
 protected:
@@ -53,18 +49,12 @@ public:
 	int textureWidth() const { return m_textureSize.x(); }
 	int textureHeight() const { return m_textureSize.y(); }
 	osg::ref_ptr<osg::Texture2D> texture() const { return m_texture; }
-	GLuint texId() const { return m_texId; }
-#if(OSG_VERSION_GREATER_OR_EQUAL(3, 4, 0))
-	void setRenderSurface(const osg::GLExtensions* fbo_ext);
-#else
-	void setRenderSurface(const osg::FBOExtensions* fbo_ext);
-#endif
+	void setRenderSurface(const osg::State& state);
 protected:
 	~OculusDepthBuffer() {}
 
 	osg::ref_ptr<osg::Texture2D> m_texture;
 	osg::Vec2i m_textureSize;
-	GLuint m_texId;
 };
 
 
@@ -149,14 +139,10 @@ class OculusDevice : public osg::Referenced {
 		bool submitFrame(unsigned int frameIndex = 0);
 		void blitMirrorTexture(osg::GraphicsContext *gc);
 
-		void toggleLowPersistence();
-		void toggleDynamicPrediction();
 		void setPerfHudMode(int mode);
 		osg::GraphicsContext::Traits* graphicsContextTraits() const;
 	protected:
 		~OculusDevice(); // Since we inherit from osg::Referenced we must make destructor protected
-
-		int renderOrder(Eye eye) const;
 
 		void printHMDDebugInfo();
 
@@ -171,6 +157,7 @@ class OculusDevice : public osg::Referenced {
 		void trySetProcessAsHighPriority() const;
 		
 		ovrHmd m_hmdDevice;
+		ovrHmdDesc m_hmdDesc;
 		
 		const float m_pixelsPerDisplayPixel;
 		const float m_worldUnitsPerMetre;
@@ -179,7 +166,6 @@ class OculusDevice : public osg::Referenced {
 		osg::ref_ptr<OculusDepthBuffer> m_depthBuffer[2];
 		osg::ref_ptr<OculusMirrorTexture> m_mirrorTexture;
 		
-		ovrSizei m_resolution;
 		ovrEyeRenderDesc m_eyeRenderDesc[2];
 		ovrVector2f m_UVScaleOffset[2][2];
 		ovrFrameTiming m_frameTiming;
