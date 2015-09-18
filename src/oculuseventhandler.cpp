@@ -40,6 +40,11 @@ bool OculusEventHandler::handle(const osgGA::GUIEventAdapter& ea,osgGA::GUIActio
 				m_oculusDevice->setPerfHudMode(4);
 				return osgGA::GUIEventHandler::handle(ea, ad);
 				break;
+			case osgGA::GUIEventAdapter::KEY_X:
+				m_usePositionalTracking = !m_usePositionalTracking;
+				m_oculusDevice->setPositionalTrackingState(m_usePositionalTracking);
+				return osgGA::GUIEventHandler::handle(ea, ad);
+				break;
 			default:
 				return osgGA::GUIEventHandler::handle(ea, ad);
 			} 

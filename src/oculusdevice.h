@@ -30,7 +30,6 @@ public:
 	int textureHeight() const { return m_textureSize.y(); }
 	int samples() const { return m_samples; }
 	ovrSwapTextureSet* textureSet() const { return m_textureSet; }
-	void createRenderBuffers(const ovrHmd& hmd, osg::ref_ptr<osg::State> state, const ovrSizei& size);
 	osg::ref_ptr<osg::Texture2D> colorBuffer() const { return m_colorBuffer; }
 	osg::ref_ptr<osg::Texture2D> depthBuffer() const { return m_depthBuffer; }
 	void advanceIndex() { m_textureSet->CurrentIndex = (m_textureSet->CurrentIndex + 1) % m_textureSet->TextureCount; }
@@ -135,7 +134,6 @@ class OculusDevice : public osg::Referenced {
 
 		float nearClip() const { return m_nearClip;	}
 		float farClip() const { return m_farClip; }
-		bool useTimewarp() const { return m_useTimeWarp; }
 
 		void resetSensorOrientation() const;
 		void updatePose(unsigned int frameIndex = 0);
@@ -149,6 +147,8 @@ class OculusDevice : public osg::Referenced {
 		void blitMirrorTexture(osg::GraphicsContext *gc);
 
 		void setPerfHudMode(int mode);
+		void setPositionalTrackingState(bool state);
+
 		osg::GraphicsContext::Traits* graphicsContextTraits() const;
 	protected:
 		~OculusDevice(); // Since we inherit from osg::Referenced we must make destructor protected
@@ -191,7 +191,6 @@ class OculusDevice : public osg::Referenced {
 
 		float m_nearClip;
 		float m_farClip;
-		bool m_useTimeWarp;
 		int m_samples;
 	private:
 		OculusDevice(const OculusDevice&); // Do not allow copy

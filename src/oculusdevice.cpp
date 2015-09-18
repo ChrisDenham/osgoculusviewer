@@ -507,6 +507,16 @@ void OculusDevice::setPerfHudMode(int mode) {
 	if (mode == 4) ovr_SetInt(m_hmdDevice, "PerfHudMode", (int)ovrPerfHud_VersionInfo);
 }
 
+void OculusDevice::setPositionalTrackingState(bool state) {
+	unsigned sensorCaps = 0;
+	sensorCaps = ovrTrackingCap_Orientation | ovrTrackingCap_MagYawCorrection;
+	if (state)
+	{
+		sensorCaps |= ovrTrackingCap_Position;
+	}
+	ovr_ConfigureTracking(m_hmdDevice, sensorCaps, 0);
+}
+
 osg::GraphicsContext::Traits* OculusDevice::graphicsContextTraits() const {
 	// Create screen with match the Oculus Rift resolution
 	osg::GraphicsContext::WindowingSystemInterface* wsi = osg::GraphicsContext::getWindowingSystemInterface();
@@ -597,16 +607,17 @@ void OculusDevice::calculateEyeAdjustment() {
 }
 
 void OculusDevice::calculateProjectionMatrices() {
-	bool isRightHanded = true;
+	unsigned int projectionModifier = ovrProjection_RightHanded;
+	projectionModifier |= ovrProjection_ClipRangeOpenGL;
 
-	ovrMatrix4f leftEyeProjectionMatrix = ovrMatrix4f_Projection(m_eyeRenderDesc[0].Fov, m_nearClip, m_farClip, isRightHanded);
+	ovrMatrix4f leftEyeProjectionMatrix = ovrMatrix4f_Projection(m_eyeRenderDesc[0].Fov, m_nearClip, m_farClip, projectionModifier);
 	// Transpose matrix
 	m_leftEyeProjectionMatrix.set(leftEyeProjectionMatrix.M[0][0], leftEyeProjectionMatrix.M[1][0], leftEyeProjectionMatrix.M[2][0], leftEyeProjectionMatrix.M[3][0],
 		leftEyeProjectionMatrix.M[0][1], leftEyeProjectionMatrix.M[1][1], leftEyeProjectionMatrix.M[2][1], leftEyeProjectionMatrix.M[3][1],
 		leftEyeProjectionMatrix.M[0][2], leftEyeProjectionMatrix.M[1][2], leftEyeProjectionMatrix.M[2][2], leftEyeProjectionMatrix.M[3][2],
 		leftEyeProjectionMatrix.M[0][3], leftEyeProjectionMatrix.M[1][3], leftEyeProjectionMatrix.M[2][3], leftEyeProjectionMatrix.M[3][3]);
 
-	ovrMatrix4f rightEyeProjectionMatrix = ovrMatrix4f_Projection(m_eyeRenderDesc[1].Fov, m_nearClip, m_farClip, isRightHanded);
+	ovrMatrix4f rightEyeProjectionMatrix = ovrMatrix4f_Projection(m_eyeRenderDesc[1].Fov, m_nearClip, m_farClip, projectionModifier);
 	// Transpose matrix
 	m_rightEyeProjectionMatrix.set(rightEyeProjectionMatrix.M[0][0], rightEyeProjectionMatrix.M[1][0], rightEyeProjectionMatrix.M[2][0], rightEyeProjectionMatrix.M[3][0],
 		rightEyeProjectionMatrix.M[0][1], rightEyeProjectionMatrix.M[1][1], rightEyeProjectionMatrix.M[2][1], rightEyeProjectionMatrix.M[3][1],
