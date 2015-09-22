@@ -11,7 +11,7 @@
 #include "oculusdevice.h"
 
 #ifdef _WIN32
-#include <Windows.h>
+	#include <Windows.h>
 #endif
 
 #include <osg/Geometry>
@@ -19,7 +19,7 @@
 #include <osgViewer/GraphicsWindow>
 
 #ifndef GL_TEXTURE_MAX_LEVEL
-#define GL_TEXTURE_MAX_LEVEL 0x813D
+	#define GL_TEXTURE_MAX_LEVEL 0x813D
 #endif
 
 static const OSG_GLExtensions* getGLExtensions(const osg::State& state)
@@ -31,57 +31,70 @@ static const OSG_GLExtensions* getGLExtensions(const osg::State& state)
 #endif
 }
 
+static const OSG_Texture_Extensions* getTextureExtensions(const osg::State& state)
+{
+#if(OSG_VERSION_GREATER_OR_EQUAL(3, 4, 0))
+	return state.get<osg::GLExtensions>();
+#else
+	return osg::Texture::getExtensions(state.getContextID(), true);
+#endif
+}
+
 static osg::FrameBufferObject* getFrameBufferObject(osg::RenderInfo& renderInfo)
 {
 	osg::Camera* camera = renderInfo.getCurrentCamera();
-	osgViewer::Renderer *camRenderer = (dynamic_cast<osgViewer::Renderer*>(camera->getRenderer()));
-	if (camRenderer != NULL) 
+	osgViewer::Renderer* camRenderer = (dynamic_cast<osgViewer::Renderer*>(camera->getRenderer()));
+
+	if (camRenderer != nullptr)
 	{
 		osgUtil::SceneView* sceneView = camRenderer->getSceneView(0);
-		if (sceneView != NULL) 
+
+		if (sceneView != nullptr)
 		{
 			osgUtil::RenderStage* renderStage = sceneView->getRenderStage();
-			if (renderStage != NULL) 
+
+			if (renderStage != nullptr)
 			{
 				return renderStage->getFrameBufferObject();
 			}
 		}
 	}
-	return NULL;
+	return nullptr;
 }
 
-void OculusPreDrawCallback::operator()(osg::RenderInfo& renderInfo) const 
+void OculusPreDrawCallback::operator()(osg::RenderInfo& renderInfo) const
 {
 	m_textureBuffer->onPreRender(renderInfo);
 }
 
-void OculusPostDrawCallback::operator()(osg::RenderInfo& renderInfo) const 
+void OculusPostDrawCallback::operator()(osg::RenderInfo& renderInfo) const
 {
 	m_textureBuffer->onPostRender(renderInfo);
 }
 
 /* Public functions */
-OculusTextureBuffer::OculusTextureBuffer(const ovrHmd& hmd, osg::ref_ptr<osg::State> state, const ovrSizei& size, int samples) : m_hmdDevice(hmd), m_textureSet(0),
-m_colorBuffer(0),
-m_depthBuffer(0),
-m_textureSize(osg::Vec2i(size.w, size.h)),
-m_Oculus_FBO(0),
-m_samples(samples)
+OculusTextureBuffer::OculusTextureBuffer(const ovrHmd& hmd, osg::ref_ptr<osg::State> state, const ovrSizei& size, int samples) : m_hmdDevice(hmd),
+	m_textureSet(nullptr),
+	m_colorBuffer(nullptr),
+	m_depthBuffer(nullptr),
+	m_textureSize(osg::Vec2i(size.w, size.h)),
+	m_Oculus_FBO(0),
+	m_samples(samples)
 {
 	if (samples == 0)
 	{
-		SetupNormal(*state);
+		setup(*state);
 	}
 	else
 	{
-		SetupMSAA(*state);
+		setupMSAA(*state);
 	}
 
 }
 
-void OculusTextureBuffer::SetupNormal(osg::State& state)
+void OculusTextureBuffer::setup(osg::State& state)
 {
-	if (ovr_CreateSwapTextureSetGL(m_hmdDevice, GL_SRGB8_ALPHA8, textureWidth(), textureHeight(), &m_textureSet) == ovrSuccess) 
+	if (ovr_CreateSwapTextureSetGL(m_hmdDevice, GL_SRGB8_ALPHA8, textureWidth(), textureHeight(), &m_textureSet) == ovrSuccess)
 	{
 		// Assign textures to OSG textures
 		for (int i = 0; i < m_textureSet->TextureCount; ++i)
@@ -107,13 +120,16 @@ void OculusTextureBuffer::SetupNormal(osg::State& state)
 			texture->setSourceFormat(GL_SRGB8_ALPHA8);
 
 			// Set the current texture to point to the texture with the index (which will be advanced before drawing)
-			if (i == (m_textureSet->CurrentIndex + 1)) {
+			if (i == (m_textureSet->CurrentIndex + 1))
+			{
 				m_colorBuffer = texture;
 			}
 		}
+
 		osg::notify(osg::DEBUG_INFO) << "Successfully created the swap texture set!" << std::endl;
 	}
-	else {
+	else
+	{
 		osg::notify(osg::WARN) << "Warning: Unable to create swap texture set! " << std::endl;
 		return;
 	}
@@ -133,7 +149,7 @@ void OculusTextureBuffer::SetupNormal(osg::State& state)
 }
 
 
-void OculusTextureBuffer::SetupMSAA(osg::State& state)
+void OculusTextureBuffer::setupMSAA(osg::State& state)
 {
 	const OSG_GLExtensions* fbo_ext = getGLExtensions(state);
 
@@ -160,8 +176,7 @@ void OculusTextureBuffer::SetupMSAA(osg::State& state)
 	// We don't want to support MIPMAP so, ensure only level 0 is allowed.
 	const int maxTextureLevel = 0;
 
-	const unsigned int contextID = state.getContextID();
-	const osg::Texture::Extensions* extensions = osg::Texture::getExtensions(contextID, true);
+	const OSG_Texture_Extensions* extensions = getTextureExtensions(state);
 
 	// Create MSAA colour buffer
 	glGenTextures(1, &m_MSAA_ColorTex);
@@ -194,7 +209,8 @@ void OculusTextureBuffer::onPreRender(osg::RenderInfo& renderInfo)
 	if (m_samples == 0)
 	{
 		osg::FrameBufferObject* fbo = getFrameBufferObject(renderInfo);
-		if (fbo == NULL)
+
+		if (fbo == nullptr)
 		{
 			return;
 		}
@@ -223,7 +239,7 @@ void OculusTextureBuffer::onPostRender(osg::RenderInfo& renderInfo)
 
 	osg::State& state = *renderInfo.getState();
 	const OSG_GLExtensions* fbo_ext = getGLExtensions(state);
-	
+
 	fbo_ext->glBindFramebuffer(GL_READ_FRAMEBUFFER_EXT, m_MSAA_FBO);
 	fbo_ext->glFramebufferTexture2D(GL_READ_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D_MULTISAMPLE, m_MSAA_ColorTex, 0);
 	fbo_ext->glFramebufferRenderbuffer(GL_READ_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, 0);
@@ -241,11 +257,13 @@ void OculusTextureBuffer::onPostRender(osg::RenderInfo& renderInfo)
 
 }
 
-void OculusTextureBuffer::destroy() {
+void OculusTextureBuffer::destroy()
+{
 	ovr_DestroySwapTextureSet(m_hmdDevice, m_textureSet);
 }
 
-OculusMirrorTexture::OculusMirrorTexture(const ovrHmd& hmd, osg::ref_ptr<osg::State> state, int width, int height) : m_hmdDevice(hmd), m_texture(NULL) {
+OculusMirrorTexture::OculusMirrorTexture(const ovrHmd& hmd, osg::ref_ptr<osg::State> state, int width, int height) : m_hmdDevice(hmd), m_texture(nullptr)
+{
 	const OSG_GLExtensions* fbo_ext = getGLExtensions(*state);
 	ovr_CreateMirrorTextureGL(m_hmdDevice, GL_SRGB8_ALPHA8, width, height, reinterpret_cast<ovrTexture**>(&m_texture));
 	// Configure the mirror read buffer
@@ -256,7 +274,8 @@ OculusMirrorTexture::OculusMirrorTexture(const ovrHmd& hmd, osg::ref_ptr<osg::St
 	fbo_ext->glBindFramebuffer(GL_READ_FRAMEBUFFER_EXT, 0);
 }
 
-void OculusMirrorTexture::blitTexture(osg::GraphicsContext* gc) {
+void OculusMirrorTexture::blitTexture(osg::GraphicsContext* gc)
+{
 	const OSG_GLExtensions* fbo_ext = getGLExtensions(*(gc->getState()));
 	// Blit mirror texture to back buffer
 	fbo_ext->glBindFramebuffer(GL_READ_FRAMEBUFFER_EXT, m_mirrorFBO);
@@ -264,44 +283,51 @@ void OculusMirrorTexture::blitTexture(osg::GraphicsContext* gc) {
 	GLint w = m_texture->OGL.Header.TextureSize.w;
 	GLint h = m_texture->OGL.Header.TextureSize.h;
 	fbo_ext->glBlitFramebuffer(0, h, w, 0,
-		0, 0, w, h,
-		GL_COLOR_BUFFER_BIT, GL_NEAREST);
+							   0, 0, w, h,
+							   GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	fbo_ext->glBindFramebuffer(GL_READ_FRAMEBUFFER_EXT, 0);
 }
 
-void OculusMirrorTexture::destroy(const OSG_GLExtensions* fbo_ext) {
-	if (fbo_ext) {
+void OculusMirrorTexture::destroy(const OSG_GLExtensions* fbo_ext)
+{
+	if (fbo_ext)
+	{
 		fbo_ext->glDeleteFramebuffers(1, &m_mirrorFBO);
 	}
+
 	ovr_DestroyMirrorTexture(m_hmdDevice, reinterpret_cast<ovrTexture*>(m_texture));
 }
 
 /* Public functions */
-OculusDevice::OculusDevice(float nearClip, float farClip, const float pixelsPerDisplayPixel, const float worldUnitsPerMetre, const int samples) : 
-m_hmdDevice(0),
-m_hmdDesc(),
-m_pixelsPerDisplayPixel(pixelsPerDisplayPixel),
-m_worldUnitsPerMetre(worldUnitsPerMetre),
-m_mirrorTexture(nullptr),
-m_position(osg::Vec3(0.0f, 0.0f, 0.0f)),
-m_orientation(osg::Quat(0.0f, 0.0f, 0.0f, 1.0f)),
-m_nearClip(nearClip), m_farClip(farClip),
-m_samples(samples)
+OculusDevice::OculusDevice(float nearClip, float farClip, const float pixelsPerDisplayPixel, const float worldUnitsPerMetre, const int samples) :
+	m_hmdDevice(nullptr),
+	m_hmdDesc(),
+	m_pixelsPerDisplayPixel(pixelsPerDisplayPixel),
+	m_worldUnitsPerMetre(worldUnitsPerMetre),
+	m_mirrorTexture(nullptr),
+	m_position(osg::Vec3(0.0f, 0.0f, 0.0f)),
+	m_orientation(osg::Quat(0.0f, 0.0f, 0.0f, 1.0f)),
+	m_nearClip(nearClip), m_farClip(farClip),
+	m_samples(samples)
 {
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < 2; i++)
+	{
 		m_textureBuffer[i] = nullptr;
 	}
 
-	ovrGraphicsLuid luid; 
+	ovrGraphicsLuid luid;
 
 	trySetProcessAsHighPriority();
-	if (ovr_Initialize(nullptr) != ovrSuccess) {
+
+	if (ovr_Initialize(nullptr) != ovrSuccess)
+	{
 		osg::notify(osg::WARN) << "Warning: Unable to initialize the Oculus library!" << std::endl;
 		return;
 	}
 
 	// Get first available HMD
 	ovrResult result = ovr_Create(&m_hmdDevice, &luid);
+
 	if (result != ovrSuccess)
 	{
 		osg::notify(osg::WARN) << "Warning: No device could be found." << std::endl;
@@ -315,22 +341,27 @@ m_samples(samples)
 	printHMDDebugInfo();
 }
 
-void OculusDevice::createRenderBuffers(osg::ref_ptr<osg::State> state) {
+void OculusDevice::createRenderBuffers(osg::ref_ptr<osg::State> state)
+{
 	// Compute recommended render texture size
-	if (m_pixelsPerDisplayPixel > 1.0f) {
+	if (m_pixelsPerDisplayPixel > 1.0f)
+	{
 		osg::notify(osg::WARN) << "Warning: Pixel per display pixel is set to a value higher than 1.0." << std::endl;
 	}
+
 	for (int i = 0; i < 2; i++)
 	{
 		ovrSizei recommenedTextureSize = ovr_GetFovTextureSize(m_hmdDevice, (ovrEyeType)i, m_hmdDesc.DefaultEyeFov[i], m_pixelsPerDisplayPixel);
 		m_textureBuffer[i] = new OculusTextureBuffer(m_hmdDevice, state, recommenedTextureSize, m_samples);
 	}
+
 	int width = screenResolutionWidth() / 2;
 	int height = screenResolutionHeight() / 2;
 	m_mirrorTexture = new OculusMirrorTexture(m_hmdDevice, state, width, height);
 }
 
-void OculusDevice::init() {
+void OculusDevice::init()
+{
 	initializeEyeRenderDesc();
 
 	calculateEyeAdjustment();
@@ -343,8 +374,8 @@ void OculusDevice::init() {
 
 	// Start the sensor which provides the Rift's pose and motion.
 	ovr_ConfigureTracking(m_hmdDevice, ovrTrackingCap_Orientation |
-		ovrTrackingCap_MagYawCorrection |
-		ovrTrackingCap_Position, 0);
+						  ovrTrackingCap_MagYawCorrection |
+						  ovrTrackingCap_Position, 0);
 
 	// Setup layers
 	setupLayers();
@@ -410,7 +441,8 @@ osg::Matrix OculusDevice::viewMatrixRight() const
 	return viewMatrix;
 }
 
-void OculusDevice::resetSensorOrientation() const {
+void OculusDevice::resetSensorOrientation() const
+{
 	ovr_RecenterPose(m_hmdDevice);
 }
 
@@ -421,7 +453,7 @@ void OculusDevice::updatePose(unsigned int frameIndex)
 
 	m_viewOffset[0] = m_eyeRenderDesc[0].HmdToEyeViewOffset;
 	m_viewOffset[1] = m_eyeRenderDesc[1].HmdToEyeViewOffset;
-	
+
 	// Query the HMD for the current tracking state.
 	ovrTrackingState ts = ovr_GetTrackingState(m_hmdDevice, m_frameTiming.DisplayMidpointSeconds);
 	ovr_CalcEyePoses(ts.HeadPose.ThePose, m_viewOffset, m_eyeRenderPose);
@@ -441,12 +473,12 @@ osg::Camera* OculusDevice::createRTTCamera(OculusDevice::Eye eye, osg::Transform
 	if (m_samples != 0)
 	{
 		// If we are using MSAA, we don't want OSG doing anything regarding FBO
-		// setup and selection because this is handled completely by 'SetupMSAA' 
-		// and by pre and post render callbacks. So setting target to FRAME_BUFFER 
+		// setup and selection because this is handled completely by 'SetupMSAA'
+		// and by pre and post render callbacks. So setting target to FRAME_BUFFER
 		// here to prevent OSG from undoing the MSAA buffer configuration.
 		// Note that we also implicity avoid the camera buffer attachments below
 		// when MSAA is enabled because we don't want OSG to affect the texture
-		// bindings handled by the pre and post render callbacks. 
+		// bindings handled by the pre and post render callbacks.
 		target = osg::Camera::FRAME_BUFFER;
 	}
 
@@ -477,8 +509,8 @@ osg::Camera* OculusDevice::createRTTCamera(OculusDevice::Eye eye, osg::Transform
 	return camera.release();
 }
 
-bool OculusDevice::submitFrame(unsigned int frameIndex) {
-
+bool OculusDevice::submitFrame(unsigned int frameIndex)
+{
 	m_layerEyeFov.ColorTexture[0] = m_textureBuffer[0]->textureSet();
 	m_layerEyeFov.ColorTexture[1] = m_textureBuffer[1]->textureSet();
 
@@ -495,33 +527,44 @@ bool OculusDevice::submitFrame(unsigned int frameIndex) {
 	return result == ovrSuccess;
 }
 
-void OculusDevice::blitMirrorTexture(osg::GraphicsContext* gc) {
+void OculusDevice::blitMirrorTexture(osg::GraphicsContext* gc)
+{
 	m_mirrorTexture->blitTexture(gc);
 }
 
-void OculusDevice::setPerfHudMode(int mode) {
-	if (mode == 0) ovr_SetInt(m_hmdDevice, "PerfHudMode", (int)ovrPerfHud_Off);
-	if (mode == 1) ovr_SetInt(m_hmdDevice, "PerfHudMode", (int)ovrPerfHud_LatencyTiming);
-	if (mode == 2) ovr_SetInt(m_hmdDevice, "PerfHudMode", (int)ovrPerfHud_RenderTiming);
-	if (mode == 3) ovr_SetInt(m_hmdDevice, "PerfHudMode", (int)ovrPerfHud_PerfHeadroom);
-	if (mode == 4) ovr_SetInt(m_hmdDevice, "PerfHudMode", (int)ovrPerfHud_VersionInfo);
+void OculusDevice::setPerfHudMode(int mode)
+{
+	if (mode == 0) { ovr_SetInt(m_hmdDevice, "PerfHudMode", (int)ovrPerfHud_Off); }
+
+	if (mode == 1) { ovr_SetInt(m_hmdDevice, "PerfHudMode", (int)ovrPerfHud_LatencyTiming); }
+
+	if (mode == 2) { ovr_SetInt(m_hmdDevice, "PerfHudMode", (int)ovrPerfHud_RenderTiming); }
+
+	if (mode == 3) { ovr_SetInt(m_hmdDevice, "PerfHudMode", (int)ovrPerfHud_PerfHeadroom); }
+
+	if (mode == 4) { ovr_SetInt(m_hmdDevice, "PerfHudMode", (int)ovrPerfHud_VersionInfo); }
 }
 
-void OculusDevice::setPositionalTrackingState(bool state) {
+void OculusDevice::setPositionalTrackingState(bool state)
+{
 	unsigned sensorCaps = 0;
 	sensorCaps = ovrTrackingCap_Orientation | ovrTrackingCap_MagYawCorrection;
+
 	if (state)
 	{
 		sensorCaps |= ovrTrackingCap_Position;
 	}
+
 	ovr_ConfigureTracking(m_hmdDevice, sensorCaps, 0);
 }
 
-osg::GraphicsContext::Traits* OculusDevice::graphicsContextTraits() const {
+osg::GraphicsContext::Traits* OculusDevice::graphicsContextTraits() const
+{
 	// Create screen with match the Oculus Rift resolution
 	osg::GraphicsContext::WindowingSystemInterface* wsi = osg::GraphicsContext::getWindowingSystemInterface();
 
-	if (!wsi) {
+	if (!wsi)
+	{
 		osg::notify(osg::NOTICE) << "Error, no WindowSystemInterface available, cannot create windows." << std::endl;
 		return 0;
 	}
@@ -531,13 +574,15 @@ osg::GraphicsContext::Traits* OculusDevice::graphicsContextTraits() const {
 	si.readDISPLAY();
 
 	// If displayNum has not been set, reset it to 0.
-	if (si.displayNum < 0) {
+	if (si.displayNum < 0)
+	{
 		si.displayNum = 0;
 		osg::notify(osg::INFO) << "Couldn't get display number, setting to 0" << std::endl;
 	}
 
 	// If screenNum has not been set, reset it to 0.
-	if (si.screenNum < 0) {
+	if (si.screenNum < 0)
+	{
 		si.screenNum = 0;
 		osg::notify(osg::INFO) << "Couldn't get screen number, setting to 0" << std::endl;
 	}
@@ -555,7 +600,7 @@ osg::GraphicsContext::Traits* OculusDevice::graphicsContextTraits() const {
 	traits->width = screenResolutionWidth() / 2;
 	traits->height = screenResolutionHeight() / 2;
 	traits->doubleBuffer = true;
-	traits->sharedContext = 0;
+	traits->sharedContext = nullptr;
 	traits->vsync = false; // VSync should always be disabled for Oculus Rift applications, the SDK compositor handles the swap
 
 	return traits.release();
@@ -566,9 +611,10 @@ OculusDevice::~OculusDevice()
 {
 	// Delete mirror texture
 	m_mirrorTexture->destroy();
-	
+
 	// Delete texture and depth buffers
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < 2; i++)
+	{
 		m_textureBuffer[i]->destroy();
 	}
 
@@ -576,7 +622,8 @@ OculusDevice::~OculusDevice()
 	ovr_Shutdown();
 }
 
-void OculusDevice::printHMDDebugInfo() {
+void OculusDevice::printHMDDebugInfo()
+{
 	osg::notify(osg::ALWAYS) << "Product:         " << m_hmdDesc.ProductName << std::endl;
 	osg::notify(osg::ALWAYS) << "Manufacturer:    " << m_hmdDesc.Manufacturer << std::endl;
 	osg::notify(osg::ALWAYS) << "VendorId:        " << m_hmdDesc.VendorId << std::endl;
@@ -585,12 +632,14 @@ void OculusDevice::printHMDDebugInfo() {
 	osg::notify(osg::ALWAYS) << "FirmwareVersion: " << m_hmdDesc.FirmwareMajor << "." << m_hmdDesc.FirmwareMinor << std::endl;
 }
 
-void OculusDevice::initializeEyeRenderDesc() {
+void OculusDevice::initializeEyeRenderDesc()
+{
 	m_eyeRenderDesc[0] = ovr_GetRenderDesc(m_hmdDevice, ovrEye_Left, m_hmdDesc.DefaultEyeFov[0]);
 	m_eyeRenderDesc[1] = ovr_GetRenderDesc(m_hmdDevice, ovrEye_Right, m_hmdDesc.DefaultEyeFov[1]);
 }
 
-void OculusDevice::calculateEyeAdjustment() {
+void OculusDevice::calculateEyeAdjustment()
+{
 	ovrVector3f leftEyeAdjust = m_eyeRenderDesc[0].HmdToEyeViewOffset;
 	ovrVector3f rightEyeAdjust = m_eyeRenderDesc[1].HmdToEyeViewOffset;
 
@@ -606,26 +655,28 @@ void OculusDevice::calculateEyeAdjustment() {
 	m_rightEyeAdjust *= m_worldUnitsPerMetre;
 }
 
-void OculusDevice::calculateProjectionMatrices() {
+void OculusDevice::calculateProjectionMatrices()
+{
 	unsigned int projectionModifier = ovrProjection_RightHanded;
 	projectionModifier |= ovrProjection_ClipRangeOpenGL;
 
 	ovrMatrix4f leftEyeProjectionMatrix = ovrMatrix4f_Projection(m_eyeRenderDesc[0].Fov, m_nearClip, m_farClip, projectionModifier);
 	// Transpose matrix
 	m_leftEyeProjectionMatrix.set(leftEyeProjectionMatrix.M[0][0], leftEyeProjectionMatrix.M[1][0], leftEyeProjectionMatrix.M[2][0], leftEyeProjectionMatrix.M[3][0],
-		leftEyeProjectionMatrix.M[0][1], leftEyeProjectionMatrix.M[1][1], leftEyeProjectionMatrix.M[2][1], leftEyeProjectionMatrix.M[3][1],
-		leftEyeProjectionMatrix.M[0][2], leftEyeProjectionMatrix.M[1][2], leftEyeProjectionMatrix.M[2][2], leftEyeProjectionMatrix.M[3][2],
-		leftEyeProjectionMatrix.M[0][3], leftEyeProjectionMatrix.M[1][3], leftEyeProjectionMatrix.M[2][3], leftEyeProjectionMatrix.M[3][3]);
+								  leftEyeProjectionMatrix.M[0][1], leftEyeProjectionMatrix.M[1][1], leftEyeProjectionMatrix.M[2][1], leftEyeProjectionMatrix.M[3][1],
+								  leftEyeProjectionMatrix.M[0][2], leftEyeProjectionMatrix.M[1][2], leftEyeProjectionMatrix.M[2][2], leftEyeProjectionMatrix.M[3][2],
+								  leftEyeProjectionMatrix.M[0][3], leftEyeProjectionMatrix.M[1][3], leftEyeProjectionMatrix.M[2][3], leftEyeProjectionMatrix.M[3][3]);
 
 	ovrMatrix4f rightEyeProjectionMatrix = ovrMatrix4f_Projection(m_eyeRenderDesc[1].Fov, m_nearClip, m_farClip, projectionModifier);
 	// Transpose matrix
 	m_rightEyeProjectionMatrix.set(rightEyeProjectionMatrix.M[0][0], rightEyeProjectionMatrix.M[1][0], rightEyeProjectionMatrix.M[2][0], rightEyeProjectionMatrix.M[3][0],
-		rightEyeProjectionMatrix.M[0][1], rightEyeProjectionMatrix.M[1][1], rightEyeProjectionMatrix.M[2][1], rightEyeProjectionMatrix.M[3][1],
-		rightEyeProjectionMatrix.M[0][2], rightEyeProjectionMatrix.M[1][2], rightEyeProjectionMatrix.M[2][2], rightEyeProjectionMatrix.M[3][2],
-		rightEyeProjectionMatrix.M[0][3], rightEyeProjectionMatrix.M[1][3], rightEyeProjectionMatrix.M[2][3], rightEyeProjectionMatrix.M[3][3]);
+								   rightEyeProjectionMatrix.M[0][1], rightEyeProjectionMatrix.M[1][1], rightEyeProjectionMatrix.M[2][1], rightEyeProjectionMatrix.M[3][1],
+								   rightEyeProjectionMatrix.M[0][2], rightEyeProjectionMatrix.M[1][2], rightEyeProjectionMatrix.M[2][2], rightEyeProjectionMatrix.M[3][2],
+								   rightEyeProjectionMatrix.M[0][3], rightEyeProjectionMatrix.M[1][3], rightEyeProjectionMatrix.M[2][3], rightEyeProjectionMatrix.M[3][3]);
 }
 
-void OculusDevice::setupLayers() {
+void OculusDevice::setupLayers()
+{
 	m_layerEyeFov.Header.Type = ovrLayerType_EyeFov;
 	m_layerEyeFov.Header.Flags = ovrLayerFlag_TextureOriginAtBottomLeft;   // Because OpenGL.
 
@@ -646,21 +697,26 @@ void OculusDevice::setupLayers() {
 	m_layerEyeFov.Fov[1] = m_eyeRenderDesc[1].Fov;
 }
 
-void OculusDevice::trySetProcessAsHighPriority() const {
+void OculusDevice::trySetProcessAsHighPriority() const
+{
 	// Require at least 4 processors, otherwise the process could occupy the machine.
-	if (OpenThreads::GetNumberOfProcessors() >= 4) {
+	if (OpenThreads::GetNumberOfProcessors() >= 4)
+	{
 #ifdef _WIN32
 		SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 #endif
 	}
 }
 
-void OculusRealizeOperation::operator() (osg::GraphicsContext* gc) {
-	if (!m_realized) {
+void OculusRealizeOperation::operator() (osg::GraphicsContext* gc)
+{
+	if (!m_realized)
+	{
 		OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
 		gc->makeCurrent();
 
-		if (osgViewer::GraphicsWindow* window = dynamic_cast<osgViewer::GraphicsWindow*>(gc)) {
+		if (osgViewer::GraphicsWindow* window = dynamic_cast<osgViewer::GraphicsWindow*>(gc))
+		{
 			// Run wglSwapIntervalEXT(0) to force VSync Off
 			window->setSyncToVBlank(false);
 		}
@@ -670,11 +726,12 @@ void OculusRealizeOperation::operator() (osg::GraphicsContext* gc) {
 		// Init the oculus system
 		m_device->init();
 	}
+
 	m_realized = true;
 }
 
-
-void OculusSwapCallback::swapBuffersImplementation(osg::GraphicsContext *gc) {
+void OculusSwapCallback::swapBuffersImplementation(osg::GraphicsContext* gc)
+{
 	// Submit rendered frame to compositor
 	m_device->submitFrame();
 
