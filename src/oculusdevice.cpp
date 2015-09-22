@@ -59,6 +59,7 @@ static osg::FrameBufferObject* getFrameBufferObject(osg::RenderInfo& renderInfo)
 			}
 		}
 	}
+
 	return nullptr;
 }
 
