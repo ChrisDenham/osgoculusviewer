@@ -27,7 +27,7 @@
 class OculusTextureBuffer : public osg::Referenced
 {
 public:
-	OculusTextureBuffer(const ovrHmd& hmd, osg::ref_ptr<osg::State> state, const ovrSizei& size, int msaaSamples);
+	OculusTextureBuffer(const ovrSession& session, osg::ref_ptr<osg::State> state, const ovrSizei& size, int msaaSamples);
 	void destroy();
 	int textureWidth() const { return m_textureSize.x(); }
 	int textureHeight() const { return m_textureSize.y(); }
@@ -42,7 +42,7 @@ public:
 protected:
 	~OculusTextureBuffer() {}
 
-	const ovrHmd m_hmdDevice;
+	const ovrSession m_session;
 	ovrSwapTextureSet* m_textureSet;
 	osg::ref_ptr<osg::Texture2D> m_colorBuffer;
 	osg::ref_ptr<osg::Texture2D> m_depthBuffer;
@@ -62,7 +62,7 @@ protected:
 class OculusMirrorTexture : public osg::Referenced
 {
 public:
-	OculusMirrorTexture(const ovrHmd& hmd, osg::ref_ptr<osg::State> state, int width, int height);
+	OculusMirrorTexture(ovrSession& session, osg::ref_ptr<osg::State> state, int width, int height);
 	void destroy(const OSG_GLExtensions* fbo_ext = 0);
 	GLuint id() const { return m_texture->OGL.TexId; }
 	GLint width() const { return m_texture->OGL.Header.TextureSize.w; }
@@ -71,7 +71,7 @@ public:
 protected:
 	~OculusMirrorTexture() {}
 
-	const ovrHmd m_hmdDevice;
+	const ovrSession m_session;
 	ovrGLTexture* m_texture;
 	GLuint m_mirrorFBO;
 };
@@ -124,7 +124,7 @@ public:
 	void createRenderBuffers(osg::ref_ptr<osg::State> state);
 	void init();
 
-	bool hmdDetected() const { return m_hmdDetected; }
+	bool hmdPresent() const;
 
 	unsigned int screenResolutionWidth() const;
 	unsigned int screenResolutionHeight() const;
@@ -172,8 +172,7 @@ protected:
 
 	void trySetProcessAsHighPriority() const;
 
-	bool m_hmdDetected;
-	ovrHmd m_hmdDevice;
+	ovrSession m_session;
 	ovrHmdDesc m_hmdDesc;
 
 	const float m_pixelsPerDisplayPixel;
@@ -184,7 +183,7 @@ protected:
 
 	ovrEyeRenderDesc m_eyeRenderDesc[2];
 	ovrVector2f m_UVScaleOffset[2][2];
-	ovrFrameTiming m_frameTiming;
+	double m_frameTiming;
 	ovrPosef m_headPose[2];
 	ovrPosef m_eyeRenderPose[2];
 	ovrLayerEyeFov m_layerEyeFov;
