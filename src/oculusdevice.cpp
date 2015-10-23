@@ -337,8 +337,6 @@ OculusDevice::OculusDevice(float nearClip, float farClip, const float pixelsPerD
 		osg::notify(osg::WARN) << "Warning: No device could be found." << std::endl;
 		return;
 	}
-	
-	m_hmdDetected = true;
 
 	// Get HMD description
 	m_hmdDesc = ovr_GetHmdDesc(m_session);
