@@ -124,6 +124,8 @@ public:
 	void createRenderBuffers(osg::ref_ptr<osg::State> state);
 	void init();
 
+	bool hmdDetected() const { return m_hmdDetected; }
+
 	unsigned int screenResolutionWidth() const;
 	unsigned int screenResolutionHeight() const;
 
@@ -170,6 +172,7 @@ protected:
 
 	void trySetProcessAsHighPriority() const;
 
+	bool m_hmdDetected;
 	ovrHmd m_hmdDevice;
 	ovrHmdDesc m_hmdDesc;
 
